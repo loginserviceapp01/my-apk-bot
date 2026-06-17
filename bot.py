@@ -1,11 +1,9 @@
 import telebot
 import requests
 import os
-import random
 import threading
 from flask import Flask
 
-# Token Environment Variable se le raha hai
 TOKEN = os.environ.get('TOKEN')
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
@@ -14,27 +12,21 @@ app = Flask(__name__)
 def home():
     return "Bot is running!"
 
+# Naya wala GoFile function
 def upload_to_hosting(file_path):
-    sites = ["catbox", "gofile"]
-    choice = random.choice(sites)
-    
-    if choice == "catbox":
-        files = {'fileToUpload': open(file_path, 'rb')}
-        data = {'reqtype': 'fileupload'}
-        res = requests.post("https://catbox.moe/user/api.php", files=files, data=data)
-        return f"✅ Unique Link (Catbox): {res.text}"
-    
-    elif choice == "gofile":
-        # GoFile automatic server selection
-        server_resp = requests.get("https://api.gofile.io/getServer").json()
-        server = server_resp["data"]["server"]
+    try:
         files = {'file': open(file_path, 'rb')}
-        res = requests.post(f"https://{server}.gofile.io/uploadFile", files=files).json()
-        return f"✅ Unique Link (GoFile): {res['data']['downloadPage']}"
+        res = requests.post("https://store1.gofile.io/uploadFile", files=files).json()
+        if res.get('status') == 'ok':
+            return f"✅ Download Link: {res['data']['downloadPage']}"
+        else:
+            return "❌ Upload fail ho gaya."
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
 
 @bot.message_handler(content_types=['document'])
 def handle_file(message):
-    bot.reply_to(message, "⏳ File mil gayi! Upload kar raha hoon, zara ruko...")
+    bot.reply_to(message, "⏳ File mil gayi! Upload kar raha hoon...")
     file_info = bot.get_file(message.document.file_id)
     downloaded_file = bot.download_file(file_info.file_path)
     file_name = message.document.file_name
