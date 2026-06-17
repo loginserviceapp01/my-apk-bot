@@ -8,6 +8,7 @@ TOKEN = os.environ.get('TOKEN')
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
+# Temporary storage
 user_session = {}
 
 @app.route('/')
@@ -31,20 +32,24 @@ def handle_name(message):
     file_name = message.text.replace(" ", "_") + ".apk"
     file_path = user_session[user_id]
     
-    bot.reply_to(message, "⏳ Uploading to Transfer.sh...")
+    bot.reply_to(message, "⏳ Uploading...")
     
     try:
-        # Transfer.sh ka use kar rahe hain (ye bahut stable hai)
+        # Pixeldrain API: Direct Upload
         with open(file_path, 'rb') as f:
-            res = requests.put(f"https://transfer.sh/{file_name}", data=f)
+            # Naam ke saath upload
+            res = requests.post("https://pixeldrain.com/api/file", files={"file": (file_name, f)})
         
         if res.status_code == 200:
-            direct_link = res.text.strip()
-            bot.reply_to(message, f"🚀 Direct Download Link:\n\n{direct_link}")
+            data = res.json()
+            file_id = data['id']
+            # Direct Download Link
+            direct_link = f"https://pixeldrain.com/api/file/{file_id}?download"
+            bot.reply_to(message, f"🚀 Link Ready:\n\n{direct_link}")
         else:
             bot.reply_to(message, f"❌ Error: {res.status_code}")
     except Exception as e:
-        bot.reply_to(message, f"❌ Exception: {str(e)}")
+        bot.reply_to(message, f"❌ System Error: {str(e)}")
     
     if os.path.exists(file_path):
         os.remove(file_path)
