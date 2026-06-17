@@ -4,10 +4,11 @@ import os
 import threading
 from flask import Flask
 
-# Token Environment Variable se le raha hai (Render Settings mein check kar lena)
 TOKEN = os.environ.get('TOKEN')
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
+
+user_data = {} # User ki file aur naam temporary store karne ke liye
 
 @app.route('/')
 def home():
@@ -15,31 +16,43 @@ def home():
 
 @bot.message_handler(content_types=['document'])
 def handle_file(message):
-    bot.reply_to(message, "⏳ File mil gayi! Upload kar raha hoon...")
-    
-    # File download karo
+    user_id = message.from_user.id
     file_info = bot.get_file(message.document.file_id)
     downloaded_file = bot.download_file(file_info.file_path)
-    file_name = message.document.file_name  # Ye file ka asli naam use karega
     
-    with open(file_name, 'wb') as new_file:
+    # File save karo
+    file_path = f"{user_id}.apk"
+    with open(file_path, 'wb') as new_file:
         new_file.write(downloaded_file)
     
-    # GoFile par upload karo
+    user_data[user_id] = {'file_path': file_path}
+    bot.reply_to(message, "✅ File mil gayi! Ab App ka naam likho (e.g., WhatsApp_Mod):")
+
+@bot.message_handler(func=lambda message: message.from_user.id in user_data)
+def handle_name(message):
+    user_id = message.from_user.id
+    app_name = message.text.replace(" ", "_") + ".apk"
+    file_path = user_data[user_id]['file_path']
+    
+    bot.reply_to(message, "⏳ Upload ho raha hai, zara ruko...")
+    
     try:
-        files = {'file': open(file_name, 'rb')}
+        # GoFile upload
+        files = {'file': (app_name, open(file_path, 'rb'))}
         res = requests.post("https://store1.gofile.io/uploadFile", files=files).json()
         
-        if res.get('status') == 'ok':
-            download_link = res['data']['downloadPage']
-            bot.reply_to(message, f"✅ Done!\n\nLink: {download_link}")
+        if res['status'] == 'ok':
+            file_id = res['data']['fileId']
+            # Direct Download Link format: https://gofile.io/download/fileId/fileName
+            direct_link = f"https://gofile.io/download/{file_id}/{app_name}"
+            bot.reply_to(message, f"🚀 Download Ready:\n\n{direct_link}")
         else:
             bot.reply_to(message, "❌ Upload fail ho gaya.")
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {str(e)}")
         
-    # Temporary file delete karo
-    os.remove(file_name)
+    os.remove(file_path)
+    del user_data[user_id]
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: bot.polling()).start()
