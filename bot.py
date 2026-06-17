@@ -14,7 +14,7 @@ def home():
 
 @bot.message_handler(content_types=['document'])
 def handle_file(message):
-    bot.reply_to(message, "⏳ Uploading to fast server...")
+    bot.reply_to(message, "⏳ File process ho rahi hai, zara ruko...")
     
     file_info = bot.get_file(message.document.file_id)
     downloaded_file = bot.download_file(file_info.file_path)
@@ -24,21 +24,20 @@ def handle_file(message):
         new_file.write(downloaded_file)
     
     try:
-        # Pixeldrain API upload
+        # File.io par upload (Har baar unique link milega)
         files = {'file': open(file_name, 'rb')}
-        res = requests.post("https://pixeldrain.com/api/file", files=files).json()
+        res = requests.post("https://file.io", files=files).json()
         
         if res.get('success'):
-            file_id = res['id']
-            # Direct download link format
-            direct_link = f"https://pixeldrain.com/api/file/{file_id}?download"
-            bot.reply_to(message, f"🚀 Direct Download Link:\n\n{direct_link}")
+            direct_link = res['link']
+            bot.reply_to(message, f"✅ Unique Direct Link:\n\n{direct_link}\n\n(Note: Link 1 baar download ke liye hai, jo security ke liye best hai.)")
         else:
-            bot.reply_to(message, "❌ Upload fail ho gaya.")
+            bot.reply_to(message, "❌ Upload fail ho gaya, server busy hai.")
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {str(e)}")
         
-    os.remove(file_name)
+    if os.path.exists(file_name):
+        os.remove(file_name)
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: bot.polling()).start()
