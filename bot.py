@@ -8,7 +8,7 @@ TOKEN = os.environ.get('TOKEN')
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-user_data = {} # User ki file aur naam temporary store karne ke liye
+user_data = {}
 
 @app.route('/')
 def home():
@@ -20,13 +20,12 @@ def handle_file(message):
     file_info = bot.get_file(message.document.file_id)
     downloaded_file = bot.download_file(file_info.file_path)
     
-    # File save karo
     file_path = f"{user_id}.apk"
     with open(file_path, 'wb') as new_file:
         new_file.write(downloaded_file)
     
     user_data[user_id] = {'file_path': file_path}
-    bot.reply_to(message, "✅ File mil gayi! Ab App ka naam likho (e.g., WhatsApp_Mod):")
+    bot.reply_to(message, "✅ File receive ho gayi! Ab app ka naam likho:")
 
 @bot.message_handler(func=lambda message: message.from_user.id in user_data)
 def handle_name(message):
@@ -34,25 +33,28 @@ def handle_name(message):
     app_name = message.text.replace(" ", "_") + ".apk"
     file_path = user_data[user_id]['file_path']
     
-    bot.reply_to(message, "⏳ Upload ho raha hai, zara ruko...")
+    bot.reply_to(message, "⏳ Uploading to GoFile...")
     
     try:
-        # GoFile upload
+        # File upload
         files = {'file': (app_name, open(file_path, 'rb'))}
-        res = requests.post("https://store1.gofile.io/uploadFile", files=files).json()
+        response = requests.post("https://store1.gofile.io/uploadFile", files=files)
+        res = response.json()
         
-        if res['status'] == 'ok':
-            file_id = res['data']['fileId']
-            # Direct Download Link format: https://gofile.io/download/fileId/fileName
-            direct_link = f"https://gofile.io/download/{file_id}/{app_name}"
-            bot.reply_to(message, f"🚀 Download Ready:\n\n{direct_link}")
+        if res.get('status') == 'ok':
+            # Direct 'downloadPage' use kar rahe hain jo sabse stable hai
+            download_link = res['data']['downloadPage']
+            bot.reply_to(message, f"🚀 Success!\n\nLink: {download_link}")
         else:
-            bot.reply_to(message, "❌ Upload fail ho gaya.")
+            bot.reply_to(message, f"❌ Error: {res.get('status')}")
+            
     except Exception as e:
-        bot.reply_to(message, f"❌ Error: {str(e)}")
+        bot.reply_to(message, f"❌ Server Error: {str(e)}")
         
-    os.remove(file_path)
-    del user_data[user_id]
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    if user_id in user_data:
+        del user_data[user_id]
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: bot.polling()).start()
