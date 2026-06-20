@@ -11,7 +11,8 @@ from telebot import types
 URL = os.environ.get("SUPABASE_URL")
 KEY = os.environ.get("SUPABASE_KEY")
 TOKEN = os.environ.get("TOKEN")
-# Yahan apna Render URL daal do
+
+# Yahan apna Render URL daal do (e.g., https://my-apk-bot.onrender.com)
 RENDER_URL = "YOUR_RENDER_URL_HERE" 
 
 supabase = create_client(URL, KEY)
@@ -79,6 +80,6 @@ if __name__ == "__main__":
     # Keep alive thread
     threading.Thread(target=keep_alive, daemon=True).start()
     # Bot polling
-    threading.Thread(target=lambda: bot.polling()).start()
-    # Flask app
+    threading.Thread(target=lambda: bot.infinity_polling()).start()
+    # Flask app (Gunicorn isko handle karega)
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
