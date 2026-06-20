@@ -1,21 +1,15 @@
 import telebot
 import os
-import uuid
 import threading
 from supabase import create_client
 from flask import Flask
 from telebot import types
 
-# 1. Configuration (Values load karna)
+# 1. Configuration
 URL = os.environ.get("SUPABASE_URL")
 KEY = os.environ.get("SUPABASE_KEY")
 TOKEN = os.environ.get("TOKEN")
 
-# Debugging ke liye check
-if not URL or not KEY or not TOKEN:
-    print(f"ERROR: Variables nahi mil rahe! URL={URL}, KEY={KEY}")
-
-# Supabase Client
 supabase = create_client(URL, KEY)
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
@@ -29,37 +23,35 @@ def home():
 @bot.message_handler(content_types=['document'])
 def ask_for_name(message):
     user_data[message.chat.id] = message.document
-    bot.reply_to(message, "📂 File mili! Is APK ka naam kya rakhna hai?")
+    bot.reply_to(message, "📂 File mili! APK ka naam kya rakhna hai? (Agar ye naam pehle se hai, toh purani file replace ho jayegi)")
 
 @bot.message_handler(func=lambda message: message.chat.id in user_data)
 def upload_to_supabase(message):
     doc = user_data.pop(message.chat.id)
-    custom_name = message.text.replace(" ", "_") + ".apk"
-    random_id = uuid.uuid4().hex[:8]
-    final_path = f"{random_id}_{custom_name}"
+    # User ka diya hua naam (saaf karke)
+    file_name = message.text.replace(" ", "_") + ".apk"
     
-    bot.reply_to(message, "⏳ Uploading...")
+    bot.reply_to(message, "⏳ Uploading and Overwriting (if exists)...")
     
     try:
-        # File download
         file_info = bot.get_file(doc.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
         
-        # Upload to Supabase (bucket: 'apks') - Content-Type force kiya gaya hai
+        # 'upsert': 'true' purani file ko delete karke nayi daal dega
         supabase.storage.from_("apks").upload(
-            path=final_path, 
+            path=file_name, 
             file=downloaded_file,
             file_options={"content-type": "application/vnd.android.package-archive", "upsert": "true"}
         )
         
-        url = supabase.storage.from_("apks").get_public_url(final_path)
+        url = supabase.storage.from_("apks").get_public_url(file_name)
         
         # Delete Button
         markup = types.InlineKeyboardMarkup()
-        btn = types.InlineKeyboardButton("🗑️ Delete File", callback_data=f"del_{final_path}")
+        btn = types.InlineKeyboardButton("🗑️ Delete File", callback_data=f"del_{file_name}")
         markup.add(btn)
         
-        bot.reply_to(message, f"✅ Uploaded Successfully!\n\n🔗 Link: {url}", reply_markup=markup)
+        bot.reply_to(message, f"✅ Done! File live hai:\n\n🔗 Link: {url}", reply_markup=markup)
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {str(e)}")
 
