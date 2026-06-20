@@ -11,7 +11,7 @@ URL = os.environ.get("SUPABASE_URL")
 KEY = os.environ.get("SUPABASE_KEY")
 TOKEN = os.environ.get("TOKEN")
 
-# Debugging ke liye check: Agar variables khali hain toh error dikhaye
+# Debugging ke liye check
 if not URL or not KEY or not TOKEN:
     print(f"ERROR: Variables nahi mil rahe! URL={URL}, KEY={KEY}")
 
@@ -45,8 +45,12 @@ def upload_to_supabase(message):
         file_info = bot.get_file(doc.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
         
-        # Upload to Supabase (bucket: 'apks')
-        supabase.storage.from_("apks").upload(final_path, downloaded_file)
+        # Upload to Supabase (bucket: 'apks') - Content-Type force kiya gaya hai
+        supabase.storage.from_("apks").upload(
+            path=final_path, 
+            file=downloaded_file,
+            file_options={"content-type": "application/vnd.android.package-archive", "upsert": "true"}
+        )
         
         url = supabase.storage.from_("apks").get_public_url(final_path)
         
