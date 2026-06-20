@@ -1,6 +1,8 @@
 import telebot
 import os
 import threading
+import time
+import requests
 from supabase import create_client
 from flask import Flask
 from telebot import types
@@ -9,10 +11,22 @@ from telebot import types
 URL = os.environ.get("SUPABASE_URL")
 KEY = os.environ.get("SUPABASE_KEY")
 TOKEN = os.environ.get("TOKEN")
+# Yahan apna Render URL daal do
+RENDER_URL = "YOUR_RENDER_URL_HERE" 
 
 supabase = create_client(URL, KEY)
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
+
+# --- SLEEP SE BACHANE KA FUNCTION ---
+def keep_alive():
+    while True:
+        try:
+            if RENDER_URL != "YOUR_RENDER_URL_HERE":
+                requests.get(RENDER_URL)
+        except:
+            pass
+        time.sleep(300) # 5 minute
 
 user_data = {}
 
@@ -28,7 +42,6 @@ def ask_for_name(message):
 @bot.message_handler(func=lambda message: message.chat.id in user_data)
 def upload_to_supabase(message):
     doc = user_data.pop(message.chat.id)
-    # User ka diya hua naam (saaf karke)
     file_name = message.text.replace(" ", "_") + ".apk"
     
     bot.reply_to(message, "⏳ Uploading and Overwriting (if exists)...")
@@ -37,7 +50,6 @@ def upload_to_supabase(message):
         file_info = bot.get_file(doc.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
         
-        # 'upsert': 'true' purani file ko delete karke nayi daal dega
         supabase.storage.from_("apks").upload(
             path=file_name, 
             file=downloaded_file,
@@ -46,7 +58,6 @@ def upload_to_supabase(message):
         
         url = supabase.storage.from_("apks").get_public_url(file_name)
         
-        # Delete Button
         markup = types.InlineKeyboardMarkup()
         btn = types.InlineKeyboardButton("🗑️ Delete File", callback_data=f"del_{file_name}")
         markup.add(btn)
@@ -65,5 +76,9 @@ def delete_file(call):
         bot.answer_callback_query(call.id, f"Error: {e}")
 
 if __name__ == "__main__":
+    # Keep alive thread
+    threading.Thread(target=keep_alive, daemon=True).start()
+    # Bot polling
     threading.Thread(target=lambda: bot.polling()).start()
+    # Flask app
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
